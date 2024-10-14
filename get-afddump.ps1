@@ -8,9 +8,11 @@ $afdProfileName = "pdmzbusinessfd01azwe"
 Set-AzContext -SubscriptionName $subscriptionName | Out-Null
 
 # get AFD profile
+write-host "Getting AFD profile: $afdProfileName"
 $afdProfile = Get-AzFrontDoorCdnProfile -name $afdProfileName -ResourceGroupName $resourceGroupName
 
 # get AFD endpoint(s)
+Write-Host "Getting AFD endpoints for profile: $afdProfileName"
 $afdEndpoints = Get-AzFrontDoorCdnEndpoint -ProfileName $afdProfileName -ResourceGroupName $resourceGroupName
 
 Write-Host "AFD Profile: $($afdProfile.Name)"
@@ -25,20 +27,25 @@ if ($afdEndpoints -is [array]) {
     exit 1
 }
 else {
-    Write-Host "AFD Endpoints: $($afdEndpoints.Name)"
+    $afdEndpoint = $afdEndpoints
+    Write-Host "AFD Endpoints: $($afdEndpoint.Name)"
 }
 
 # get all routes
-$routes = Get-AzFrontDoorCdnRoute -EndpointName $endpoint.Name -ProfileName $afdprofileName -ResourceGroupName $resourceGroupName
+Write-Host "Getting routes for endpoint: $($afdEndpoint.Name) in profile: $afdProfileName"
+$routes = Get-AzFrontDoorCdnRoute -EndpointName $afdEndpoint.Name -ProfileName $afdProfileName -ResourceGroupName $resourceGroupName
 
 # get all custom domains
-$customDomains = Get-AzFrontDoorCdnCustomDomain -ProfileName $afdprofileName -ResourceGroupName $resourceGroupName
+Write-Host "Getting custom domains for profile: $afdProfileName"
+$customDomains = Get-AzFrontDoorCdnCustomDomain -ProfileName $afdProfileName -ResourceGroupName $resourceGroupName
 
 # get all origin groups
-$originGroups = Get-AzFrontDoorCdnOriginGroup -ProfileName $afdprofileName -ResourceGroupName $resourceGroupName
+Write-Host "Getting origin groups for profile: $afdProfileName"
+$originGroups = Get-AzFrontDoorCdnOriginGroup -ProfileName $afdProfileName -ResourceGroupName $resourceGroupName
 
 # get all the rule sets
-$ruleSets = Get-AzFrontDoorCdnRuleSet -ProfileName $afdprofile.Name -ResourceGroupName $resourceGroupName
+Write-Host "Getting rule sets for profile: $($afdProfile.Name)"
+$ruleSets = Get-AzFrontDoorCdnRuleSet -ProfileName $afdProfile.Name -ResourceGroupName $resourceGroupName
 
 # create a hashtable of origin groups, each with a list of origins
 $originGroupOrigins = @{}
@@ -66,7 +73,8 @@ foreach ($route in $routes) {
     foreach ($routeDomain in $route.CustomDomain) {
         foreach ($customDomain in $customDomains) {
             if (($routeDomain.Id -eq $customDomain.Id) -and ($routeDomain.IsActive -eq $true)) {
-                $hostnames += $customDomain.HostName
+                $tls = $customDomain.TlsSetting.MinimumTlsVersion
+                $hostnames += $customDomain.HostName + ' (' + $tls + ')'
             }
         }
     }
@@ -89,11 +97,15 @@ foreach ($route in $routes) {
 
     # find the rule set for this route
     $ruleSet = $null
-    foreach ($rs in $ruleSets) {
-        if ($route.RuleSet.Id -eq $rs.Id) {
-            $ruleSet = $rs
-            break
-        }
+    if ($route.RuleSet -and $route.RuleSet.Id)
+    {
+        $routeRuleSetId = $route.RuleSet.Id
+        foreach ($rs in $ruleSets) {
+            if ($routeRuleSetId -eq $rs.Id) {
+                $ruleSet = $rs
+                break
+            }
+        }    
     }
 
     # put all the data in the hashtable
@@ -103,7 +115,7 @@ foreach ($route in $routes) {
         PatternsToMatch = $route.PatternsToMatch -join ', '
         ForwardingProtocol = $route.ForwardingProtocol
         HttpsRedirect = $route.HttpsRedirect
-        RuleSet = $ruleSet.Name
+        RuleSet = if ($null -ne $ruleSet) { $ruleSet.Name } else { '---' }
         OriginGroup = $originGroup.Name
         Origins = $origins -join ', '
     }
