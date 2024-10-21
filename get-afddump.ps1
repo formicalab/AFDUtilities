@@ -1,8 +1,8 @@
 Set-StrictMode -Version Latest
 
-$subscriptionName = "POSTE-DIGITAL-PRODUZIONE"
-$resourceGroupName = "DIGITAL-POSTEBUSINESS-FE-PROD-WE"
-$afdProfileName = "pdmzbusinessfd01azwe"
+$subscriptionName = "PRODUZIONE"
+$resourceGroupName = "RGNAME"
+$afdProfileName = "profilename"
 
 # set current subscription
 Set-AzContext -SubscriptionName $subscriptionName | Out-Null
