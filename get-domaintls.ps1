@@ -1,7 +1,13 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true, HelpMessage = "Specify the subscription filter, for example *PRODUZIONE* filters all subscriptions containing PRODUZIONE in the name")]
+    [string]$SubscriptionFilter = $null
+)
+
 Set-StrictMode -Version Latest
 
 # find all subscriptions where name contains some specific strings
-$subscriptions = Get-AzSubscription | where { $_.Name -like "*PRODUZIONE*" -or $_.Name -like "*DMZ*" }
+$subscriptions = Get-AzSubscription | Where-Object { $_.Name -like $SubscriptionFilter }
 #$subscriptions = Get-AzSubscription | where { $_.Name -like "*Flaz*"  }
 
 # loop on all subscriptions
