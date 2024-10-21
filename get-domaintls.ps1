@@ -1,7 +1,8 @@
 Set-StrictMode -Version Latest
 
-# find all subscriptions where name contains 'PRODUZIONE' or 'DMZ'
-$subscriptions = Get-AzSubscription | where { $_.Name -like "*PRODUZIONE*" -or $_.Name -like "*DMZ*" -or $_.Name -like "*POSTE-DIGITAL*" }
+# find all subscriptions where name contains some specific strings
+$subscriptions = Get-AzSubscription | where { $_.Name -like "*PRODUZIONE*" -or $_.Name -like "*DMZ*" }
+#$subscriptions = Get-AzSubscription | where { $_.Name -like "*Flaz*"  }
 
 # loop on all subscriptions
 foreach ($subscription in $subscriptions) {
@@ -27,7 +28,7 @@ foreach ($subscription in $subscriptions) {
             $tls = $customDomain.TlsSetting.MinimumTlsVersion
             if ($tls -ne 'TLS12')
             {
-                Write-Host "ERROR: Custom Domain: $($customDomain.HostName) TLS: $tls"
+                Write-Host "FOUND Custom Domain: $($customDomain.HostName) with min TLS: $tls"
             }
             else {
                 Write-Host "." -NoNewline
