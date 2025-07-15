@@ -85,8 +85,8 @@ foreach ($subscription in $subscriptions) {
 
             $result = [PSCustomObject]@{
                 SubscriptionName             = $subscriptionName
-                FrontDoorName                = $afdName
-                FrontendEndpointName         = $ep.name
+                FrontDoorClassicName         = $afdName
+                EndpointName                 = $ep.name
                 HostName                     = $ep.hostName
                 CustomHttpsProvisioningState = $CustomHttpsProvisioningState
                 CertificateSource            = $certificateSource
@@ -129,46 +129,47 @@ foreach ($subscription in $subscriptions) {
             $found = 0
             foreach ($ep in $endpoints) {
 
-                $customDomain = Get-AzCdnCustomDomain -EndpointName $ep.Name -ProfileName $cdnInstance.Name -ResourceGroupName $cdnInstance.ResourceGroupName
+                $customDomains = Get-AzCdnCustomDomain -EndpointName $ep.Name -ProfileName $cdnInstance.Name -ResourceGroupName $cdnInstance.ResourceGroupName
 
-                $CustomHttpsProvisioningState = $customDomain.CustomHttpsProvisioningState
-                $certificateSource = $customDomain.CustomHttpsParameter.CertificateSource
-                if ($certificateSource -eq 'Cdn') {
-                    $found++
-                    $minimumTlsVersion = $customDomain.CustomHttpsParameter.MinimumTlsVersion
+                foreach($customDomain in $customDomains) {
+                    $CustomHttpsProvisioningState = $customDomain.CustomHttpsProvisioningState
+                    $certificateSource = $customDomain.CustomHttpsParameter.CertificateSource
+                    if ($certificateSource -eq 'Cdn') {
+                        $found++
+                        $minimumTlsVersion = $customDomain.CustomHttpsParameter.MinimumTlsVersion
+                    }
+                    if ($customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName) {
+                        $keyVaultSecretName = $customDomain.CustomHttpsParameter.CertificateSourceParameterSecretName
+                        $keyVaultName = $customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName
+                        $minimumTlsVersion = $customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName
+                    }
+                    else {
+                        $keyVaultSecretName = $null
+                        $keyVaultName = $null
+                    }             
+
+                    if ($found -eq 0) {
+                        Write-Host -ForegroundColor Green "No managed certificates found."
+                    }
+                    else {
+                        Write-Host -ForegroundColor Yellow "Found $found endpoint(s) with managed certificates"
+                    }
+
+                    $result = [PSCustomObject]@{
+                        SubscriptionName             = $subscriptionName
+                        FrontDoorClassicName         = $cdnName
+                        EndpointName                 = $ep.name
+                        HostName                     = $customDomain.hostName
+                        CustomHttpsProvisioningState = $CustomHttpsProvisioningState
+                        CertificateSource            = $certificateSource
+                        KeyVaultSecretName           = $keyVaultSecretName
+                        KeyVaultName                 = $keyVaultName
+                        MinimumTlsVersion            = $minimumTlsVersion
+                    }
+
+                    $results += $result
                 }
-                if ($customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName) {
-                    $keyVaultSecretName = $customDomain.CustomHttpsParameter.CertificateSourceParameterSecretName
-                    $keyVaultName = $customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName
-                    $minimumTlsVersion = $customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName
-                }
-                else {
-                    $keyVaultSecretName = $null
-                    $keyVaultName = $null
-                }
-                
             }
-
-            if ($found -eq 0) {
-                Write-Host -ForegroundColor Green "No managed certificates found."
-            }
-            else {
-                Write-Host -ForegroundColor Yellow "Found $found endpoint(s) with managed certificates"
-            }
-
-            $result = [PSCustomObject]@{
-                SubscriptionName             = $subscriptionName
-                CDNName                      = $cdnName
-                CDNEndpointName              = $ep.name
-                HostName                     = $customDomain.hostName
-                CustomHttpsProvisioningState = $CustomHttpsProvisioningState
-                CertificateSource            = $certificateSource
-                KeyVaultSecretName           = $keyVaultSecretName
-                KeyVaultName                 = $keyVaultName
-                MinimumTlsVersion            = $minimumTlsVersion
-            }
-
-            $results += $result
         }
     }
 
@@ -182,4 +183,3 @@ if ($ExportCsvPath) {
     $results | Export-Csv -Path $ExportCsvPath -NoTypeInformation
     Write-Host "Results exported to $ExportCsvPath"
 }
- 
