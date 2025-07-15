@@ -2,15 +2,15 @@
 
 ## Overview
 
- Azure Front Door classic is disabling Azure managed TLS certificate provisioning.
+ Azure Front Door and CDN Classic are disabling Azure managed TLS certificate provisioning.
 
-`get-classicafdcertificates.ps1` is a PowerShell script designed to help Azure administrators retrieve and report on the TLS/SSL certificate configuration of Azure Front Door (classic) instances across multiple Azure subscriptions. It collects information about managed and Key Vault-based certificates used by Front Door frontend endpoints, including details such as certificate source, provisioning state, Key Vault names, and minimum TLS versions.
+`get-classicafdcertificates.ps1` is a PowerShell script designed to help Azure administrators retrieve and report on the TLS/SSL certificate configuration of Azure Front Door and CDN (Classic) instances across multiple Azure subscriptions. It collects information about managed and Key Vault-based certificates used by Front Door / CDN frontend endpoints, including details such as certificate source, provisioning state, Key Vault names, and minimum TLS versions.
 
-The script can be used to check which instances and profiles of Azure Front Door (Classic) are using managed certificates.
+The script can be used to check which instances and profiles of Azure Front Door and CDN (Classic) are using managed certificates.
 
 ## Features
 - Enumerates all Azure subscriptions matching a filter (by name).
-- Lists all Azure Front Door (classic) instances in each subscription.
+- Lists all Azure Front Door / CDN (classic) instances in each subscription.
 - Retrieves all frontend endpoints for each instance.
 - Collects certificate details for each endpoint, including:
   - Certificate source (Front Door managed or Key Vault)
@@ -54,7 +54,7 @@ To export the results to a CSV file:
 You can combine both parameters as needed.
 
 ## Output
-- Console table of certificate details for each Front Door (classic) endpoint.
+- Console table of certificate details for each Front Door / CDN (classic) endpoint.
 - Optional CSV file with the same information if `-ExportCsvPath` is specified.
 
 ## Example
@@ -63,7 +63,7 @@ You can combine both parameters as needed.
 ```
 
 ## Notes
-- The script only processes Azure Front Door (classic) resources, not Standard/Premium Front Door.
+- The script only processes Azure Front Door / CDN (classic) resources, not Standard/Premium Front Door.
 - Make sure you have the necessary permissions and modules installed before running the script.
 
 ## Authors
