@@ -19,7 +19,7 @@ if (-not $SubscriptionFilter) {
 }   
 
 # find all subscriptions where name contains some specific strings
-$subscriptions = Get-AzSubscription | Where-Object { $_.Name -like $SubscriptionFilter }
+$subscriptions = Get-AzSubscription -WarningAction SilentlyContinue | Where-Object { $_.Name -like $SubscriptionFilter }
 
 # prepare result collection
 $results = @()
@@ -27,8 +27,9 @@ $results = @()
 # loop on all subscriptions
 foreach ($subscription in $subscriptions) {
     # set current subscription
+    $subscriptionId = $subscription.Id
     $subscriptionName = $subscription.Name
-    Set-AzContext -SubscriptionName $subscriptionName | Out-Null
+    Set-AzContext -SubscriptionId $subscriptionId -WarningAction SilentlyContinue | Out-Null
 
     # get classic Front Door instances
     Write-Host "Subscription: $subscriptionName, getting Front Door (classic) instances... " -NoNewline
@@ -36,69 +37,141 @@ foreach ($subscription in $subscriptions) {
 
     if (-not $afdInstances) {
         Write-Host "No Front Door (classic) instances found in subscription: $subscriptionName"
-        continue
-    }
-    else {
+    } else {
         Write-Host "$($afdInstances.Count) instances found; processing... "
+        foreach ($afdInstance in $afdInstances) {
+            $afdName = $afdInstance.Name
+
+            # get all endpoints
+            Write-Host "`tInstance ${afdName}: " -NoNewline
+            $endpoints = $afdInstance | Get-AzFrontDoorFrontendEndpoint
+
+            if (-not $endpoints) {
+                Write-Host 'No endpoints found'
+                continue
+            }
+            else {
+                Write-Host "$($endpoints.Count) endpoint(s) found; processing... " -NoNewline
+            }
+            
+        
+            # loop through endpoints and collect certificate information
+            $found = 0
+            foreach ($ep in $endpoints) {
+
+                $CustomHttpsProvisioningState = $ep.CustomHttpsProvisioningState
+                $certificateSource = $ep.CertificateSource
+                if ($certificateSource -eq 'FrontDoor') {
+                    $found++
+                }
+                if ($ep.Vault) {
+                    $keyVaultSecretName = $ep.secretName
+                    $keyVaultName = ($ep.vault -split ('/'))[-1]
+                }
+                else {
+                    $keyVaultSecretName = $null
+                    $keyVaultName = $null
+                }
+                $minimumTlsVersion = $ep.minimumTlsVersion
+
+            }
+
+            if ($found -eq 0) {
+                Write-Host -ForegroundColor Green "No managed certificates found."
+            }
+            else {
+                Write-Host -ForegroundColor Yellow "Found $found endpoint(s) with managed certificates"
+            }
+
+            $result = [PSCustomObject]@{
+                SubscriptionName             = $subscriptionName
+                FrontDoorName                = $afdName
+                FrontendEndpointName         = $ep.name
+                HostName                     = $ep.hostName
+                CustomHttpsProvisioningState = $CustomHttpsProvisioningState
+                CertificateSource            = $certificateSource
+                KeyVaultSecretName           = $keyVaultSecretName
+                KeyVaultName                 = $keyVaultName
+                MinimumTlsVersion            = $minimumTlsVersion
+            }
+
+            $results += $result
+        }
     }
 
     # get the endpoints for each instance
-    foreach ($afdInstance in $afdInstances) {
-        $afdName = $afdInstance.Name
 
-        # get all endpoints
-        Write-Host "`tInstance ${afdName}: " -NoNewline
-        $endpoints = $afdInstance | Get-AzFrontDoorFrontendEndpoint
 
-        if (-not $endpoints) {
-            Write-Host 'No endpoints found'
-            continue
-        }
-        else {
-            Write-Host "$($endpoints.Count) endpoint(s) found; processing... " -NoNewline
-        }
-    
-        # loop through endpoints and collect certificate information
-        $found = 0
-        foreach ($ep in $endpoints) {
+    # get classic CDN instances
+    Write-Host "Subscription: $subscriptionName, getting CDN (classic) instances... " -NoNewline
+    $cdnInstances = Get-AzCdnProfile
 
-            $CustomHttpsProvisioningState = $ep.CustomHttpsProvisioningState
-            $certificateSource = $ep.CertificateSource
-            if ($certificateSource -eq 'FrontDoor') {
-                $found++
+    if (-not $cdnInstances) {
+        Write-Host "No CDN (classic) instances found in subscription: $subscriptionName"
+    } else {
+        Write-Host "$($cdnInstances.Count) instances found; processing... "
+        # get the endpoints for each instance
+        foreach ($cdnInstance in $cdnInstances) {
+            $cdnName = $cdnInstance.Name
+
+            # get all endpoints
+            Write-Host "`tInstance ${cdnName}: " -NoNewline
+            $endpoints = Get-AzCdnEndpoint -ProfileName $cdnInstance.Name -ResourceGroupName $cdnInstance.ResourceGroupName -WarningAction SilentlyContinue
+
+            if (-not $endpoints) {
+                Write-Host 'No endpoints found'
+                continue
+            } else {
+                Write-Host "$($endpoints.Count) endpoint(s) found; processing... " -NoNewline
             }
-            if ($ep.Vault) {
-                $keyVaultSecretName = $ep.secretName
-                $keyVaultName = ($ep.vault -split ('/'))[-1]
+        
+            # loop through endpoints and collect certificate information
+            $found = 0
+            foreach ($ep in $endpoints) {
+
+                $customDomain = Get-AzCdnCustomDomain -EndpointName $ep.Name -ProfileName $cdnInstance.Name -ResourceGroupName $cdnInstance.ResourceGroupName
+
+                $CustomHttpsProvisioningState = $customDomain.CustomHttpsProvisioningState
+                $certificateSource = $customDomain.CustomHttpsParameter.CertificateSource
+                if ($certificateSource -eq 'Cdn') {
+                    $found++
+                    $minimumTlsVersion = $customDomain.CustomHttpsParameter.MinimumTlsVersion
+                }
+                if ($customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName) {
+                    $keyVaultSecretName = $customDomain.CustomHttpsParameter.CertificateSourceParameterSecretName
+                    $keyVaultName = $customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName
+                    $minimumTlsVersion = $customDomain.CustomHttpsParameter.CertificateSourceParameterVaultName
+                }
+                else {
+                    $keyVaultSecretName = $null
+                    $keyVaultName = $null
+                }
+                
+            }
+
+            if ($found -eq 0) {
+                Write-Host -ForegroundColor Green "No managed certificates found."
             }
             else {
-                $keyVaultSecretName = $null
-                $keyVaultName = $null
+                Write-Host -ForegroundColor Yellow "Found $found endpoint(s) with managed certificates"
             }
-            $minimumTlsVersion = $ep.minimumTlsVersion
-        }
 
-        if ($found -eq 0) {
-            Write-Host -ForegroundColor Green "No managed certificates found."
-        }
-        else {
-            Write-Host -ForegroundColor Yellow "Found $found endpoint(s) with managed certificates"
-        }
+            $result = [PSCustomObject]@{
+                SubscriptionName             = $subscriptionName
+                CDNName                      = $cdnName
+                CDNEndpointName              = $ep.name
+                HostName                     = $customDomain.hostName
+                CustomHttpsProvisioningState = $CustomHttpsProvisioningState
+                CertificateSource            = $certificateSource
+                KeyVaultSecretName           = $keyVaultSecretName
+                KeyVaultName                 = $keyVaultName
+                MinimumTlsVersion            = $minimumTlsVersion
+            }
 
-        $result = [PSCustomObject]@{
-            SubscriptionName             = $subscriptionName
-            FrontDoorName                = $afdName
-            FrontendEndpointName         = $ep.name
-            HostName                     = $ep.hostName
-            CustomHttpsProvisioningState = $CustomHttpsProvisioningState
-            CertificateSource            = $certificateSource
-            KeyVaultSecretName           = $keyVaultSecretName
-            KeyVaultName                 = $keyVaultName
-            MinimumTlsVersion            = $minimumTlsVersion
+            $results += $result
         }
-
-        $results += $result
     }
+
 }
 
 # Output to console
@@ -109,3 +182,4 @@ if ($ExportCsvPath) {
     $results | Export-Csv -Path $ExportCsvPath -NoTypeInformation
     Write-Host "Results exported to $ExportCsvPath"
 }
+ 

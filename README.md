@@ -66,5 +66,5 @@ You can combine both parameters as needed.
 - The script only processes Azure Front Door (classic) resources, not Standard/Premium Front Door.
 - Make sure you have the necessary permissions and modules installed before running the script.
 
-## Author
-Marcello Formica
+## Authors
+Fabrizio Barcaroli, Marcello Formica
